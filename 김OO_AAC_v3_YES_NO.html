@@ -211,11 +211,21 @@ if (window.speechSynthesis) {
 
 function initTTS() {
   if (ttsReady || !window.speechSynthesis) return;
-  const u = new SpeechSynthesisUtterance('');
-  u.volume = 0;
+  const u = new SpeechSynthesisUtterance(' ');
+  u.lang = 'ko-KR'; u.volume = 0.01;
   speechSynthesis.speak(u);
   ttsReady = true;
 }
+
+// iOS: 화면 탭하면 TTS 잠금 해제
+document.addEventListener('touchstart', function iosTTSUnlock() {
+  if (!ttsReady && window.speechSynthesis) {
+    const u = new SpeechSynthesisUtterance(' ');
+    u.lang = 'ko-KR'; u.volume = 0.01;
+    speechSynthesis.speak(u);
+    ttsReady = true;
+  }
+}, { once: true });
 
 function speak(text) {
   if (!window.speechSynthesis) return;
