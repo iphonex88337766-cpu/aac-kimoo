@@ -333,12 +333,12 @@ const SYMBOLS = [
 // ══════════════════════════════════════════
 // 파라미터 (필요시 조정)
 // ══════════════════════════════════════════
-const HEAD_LEFT_THR   = 0.43;  // 이 값 이하 → 왼쪽 회전
-const HEAD_RIGHT_THR  = 0.57;  // 이 값 이상 → 오른쪽 회전
+const HEAD_LEFT_THR   = 0.57;  // 이 값 이상 → 왼쪽 회전 (반전)
+const HEAD_RIGHT_THR  = 0.43;  // 이 값 이하 → 오른쪽 회전 (반전)
 const HEAD_COOLDOWN   = 900;   // ms - 연속 이동 방지
-const BLINK_THR       = 0.22;  // EAR 임계값
-const BLINK_FRAMES    = 3;     // 연속 N프레임 이하 = 깜빡임
-const BLINK_COOLDOWN  = 1500;  // ms - 연속 선택 방지
+const BLINK_THR       = 0.15;  // EAR 임계값 (덜 민감하게)
+const BLINK_FRAMES    = 6;     // 연속 N프레임 이상 감겨야 (덜 민감)
+const BLINK_COOLDOWN  = 2000;  // ms - 연속 선택 방지 (2초)
 
 // ══════════════════════════════════════════
 // 상태
@@ -398,14 +398,23 @@ function speak(text) {
   speechSynthesis.cancel();
   setTimeout(() => {
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ko-KR'; u.rate = 0.85; u.pitch = 1; u.volume = 1;
+    u.lang = 'ko-KR'; u.rate = 0.8; u.pitch = 1; u.volume = 1;
     const voices = speechSynthesis.getVoices();
-    const ko = voices.find(v => v.lang === 'ko-KR') || voices.find(v => v.lang.startsWith('ko'));
+    const ko = voices.find(v => v.lang === 'ko-KR' && v.localService) ||
+               voices.find(v => v.lang === 'ko-KR') ||
+               voices.find(v => v.lang.startsWith('ko'));
     if (ko) u.voice = ko;
     u.onstart = () => { sText.classList.add('on'); };
     u.onend   = () => { sText.classList.remove('on'); };
+    u.onerror = () => {
+      setTimeout(() => {
+        const u2 = new SpeechSynthesisUtterance(text);
+        u2.lang = 'ko-KR'; u2.volume = 1;
+        speechSynthesis.speak(u2);
+      }, 200);
+    };
     speechSynthesis.speak(u);
-  }, 80);
+  }, 150);
 }
 
 speechSynthesis && speechSynthesis.addEventListener('voiceschanged', () => speechSynthesis.getVoices());
