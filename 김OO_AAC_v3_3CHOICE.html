@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>AAC - 새/고양이/공</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  width:100%; height:100%; overflow:hidden;
+  background:#0d1117;
+  font-family:-apple-system,'Apple SD Gothic Neo',sans-serif;
+  user-select:none; -webkit-user-select:none;
+}
+body {
+  display:flex; flex-direction:column;
+  height:100vh; height:100dvh;
+  padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);
+}
+
+header {
+  height:50px; flex-shrink:0;
+  background:#161b22; border-bottom:1.5px solid #30363d;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 20px;
+}
+header h1 { font-size:16px; font-weight:700; color:#58a6ff; }
+.cam-status { display:flex; align-items:center; gap:6px; font-size:12px; color:#8b949e; }
+.cam-dot { width:8px; height:8px; border-radius:50%; background:#484f58; transition:background 0.3s; }
+.cam-dot.ok { background:#238636; box-shadow:0 0 6px #238636; }
+
+.speech-bar {
+  height:44px; flex-shrink:0;
+  background:#161b22; border-bottom:1.5px solid #30363d;
+  display:flex; align-items:center; padding:0 20px; gap:10px;
+}
+.si { font-size:20px; }
+.st { font-size:16px; font-weight:700; color:#8b949e; transition:color 0.2s; }
+.st.on { color:#58a6ff; }
+
+/* 상단: 새(왼쪽) + 고양이(오른쪽) */
+.top-row {
+  flex:1; display:grid; grid-template-columns:1fr 1fr;
+  gap:10px; padding:10px 10px 5px;
+  min-height:0;
+}
+
+/* 하단: 공 (눈깜빡임) */
+.bottom-row {
+  flex:0 0 38%; padding:0 10px 10px;
+  min-height:0;
+}
+
+.choice-btn {
+  border-radius:24px; border:4px solid #30363d;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  transition:all 0.15s; position:relative; overflow:hidden;
+  width:100%; height:100%;
+}
+
+.btn-bird   { background:#0d1e3a; }
+.btn-cat    { background:#2d0d1e; }
+.btn-ball   { background:#1a1a00; }
+
+.btn-bird.active  { border-color:#58a6ff; box-shadow:0 0 0 6px rgba(88,166,255,0.4); transform:scale(0.97); }
+.btn-cat.active   { border-color:#f778ba; box-shadow:0 0 0 6px rgba(247,120,186,0.4); transform:scale(0.97); }
+.btn-ball.active  { border-color:#d29922; box-shadow:0 0 0 6px rgba(210,153,34,0.4); transform:scale(0.97); }
+
+.choice-btn .emoji { font-size:clamp(50px,12vw,100px); line-height:1; margin-bottom:8px; }
+.bottom-row .choice-btn .emoji { font-size:clamp(40px,8vw,80px); }
+.choice-btn .label { font-size:clamp(20px,5vw,40px); font-weight:900; color:#e6edf3; }
+.bottom-row .choice-btn .label { font-size:clamp(18px,4vw,32px); }
+.choice-btn .hint  { font-size:12px; color:#8b949e; margin-top:4px; }
+
+/* 선택 플래시 */
+.choice-btn.fired::after {
+  content:''; position:absolute; inset:0;
+  background:rgba(255,255,255,0.2); border-radius:20px;
+  animation:flash 0.4s ease-out forwards;
+}
+@keyframes flash { from{opacity:1} to{opacity:0} }
+
+footer {
+  height:34px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+}
+footer p { color:#484f58; font-size:11px; }
+
+/* 카메라 */
+#video {
+  position:fixed; bottom:16px; left:16px;
+  width:100px; height:75px; border-radius:8px;
+  border:2px solid #30363d; object-fit:cover;
+  transform:scaleX(-1); z-index:50; opacity:0.85;
+}
+#canvas { display:none; }
+
+/* 오버레이 */
+#overlay {
+  position:fixed; inset:0; z-index:100; background:#0d1117;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+}
+#overlay .ov-icon { font-size:48px; }
+#overlay .ov-msg  { font-size:18px; font-weight:700; color:#e6edf3; }
+#overlay .ov-sub  { font-size:13px; color:#8b949e; text-align:center; line-height:1.6; }
+.spinner { width:36px; height:36px; border-radius:50%; border:3px solid #30363d; border-top-color:#58a6ff; animation:spin 0.8s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+#overlay button { background:#58a6ff; color:#0d1117; border:none; border-radius:12px; padding:12px 28px; font-size:16px; font-weight:700; cursor:pointer; display:none; }
+
+/* 토스트 */
+.toast { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:200; }
+.toast-box { background:rgba(22,27,34,0.96); border:2px solid rgba(255,255,255,0.12); border-radius:24px; padding:24px 48px; text-align:center; opacity:0; transform:scale(0.8); transition:opacity 0.15s, transform 0.15s; }
+.toast-box.show { opacity:1; transform:scale(1); }
+.toast-box .t-e { font-size:60px; line-height:1; }
+.toast-box .t-l { font-size:28px; font-weight:900; color:#e6edf3; margin-top:8px; }
+
+/* 눈깜빡임 게이지 */
+.blink-bar { position:absolute; bottom:16px; right:16px; width:14px; height:60px; background:#21262d; border-radius:7px; overflow:hidden; }
+.blink-fill { position:absolute; bottom:0; width:100%; background:#d29922; border-radius:7px; height:0%; transition:height 0.05s; }
+</style>
+</head>
+<body>
+
+<div id="overlay">
+  <div class="ov-icon">📷</div>
+  <div class="ov-msg" id="ovMsg">카메라 준비 중...</div>
+  <div class="ov-sub" id="ovSub">카메라 권한을 허용해주세요</div>
+  <div class="spinner" id="ovSpinner"></div>
+  <button id="ovBtn" onclick="location.reload()">다시 시도</button>
+</div>
+
+<video id="video" playsinline autoplay muted></video>
+<canvas id="canvas"></canvas>
+
+<header>
+  <h1>🌟 AAC · 새 / 고양이 / 공</h1>
+  <div class="cam-status">
+    <div class="cam-dot" id="camDot"></div>
+    <span id="camLabel">연결 중</span>
+  </div>
+</header>
+
+<div class="speech-bar">
+  <span class="si">🔊</span>
+  <span class="st" id="sText">고개를 돌리거나 눈을 깜빡이세요</span>
+</div>
+
+<!-- 상단: 새(왼쪽) + 고양이(오른쪽) -->
+<div class="top-row">
+  <div class="choice-btn btn-bird" id="btnBird">
+    <span class="emoji">🐦</span>
+    <span class="label">새</span>
+    <span class="hint">◀ 왼쪽</span>
+  </div>
+  <div class="choice-btn btn-cat" id="btnCat">
+    <span class="emoji">🐱</span>
+    <span class="label">고양이</span>
+    <span class="hint">오른쪽 ▶</span>
+  </div>
+</div>
+
+<!-- 하단: 공(눈깜빡임) -->
+<div class="bottom-row" style="position:relative;">
+  <div class="choice-btn btn-ball" id="btnBall">
+    <span class="emoji">⚽</span>
+    <span class="label">공</span>
+    <span class="hint">👁 눈 깜빡임</span>
+  </div>
+  <div class="blink-bar"><div class="blink-fill" id="blinkFill"></div></div>
+</div>
+
+<footer><p>◀ 왼쪽=새 · 오른쪽=고양이 · 눈깜빡임=공 ▶</p></footer>
+
+<div class="toast">
+  <div class="toast-box" id="toastBox">
+    <div class="t-e" id="tEmoji"></div>
+    <div class="t-l" id="tLabel"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/face_mesh.js" crossorigin="anonymous"></script>
+
+<script>
+// ── 파라미터 ──
+const YAW_LEFT    = 0.42;
+const YAW_RIGHT   = 0.58;
+const COOLDOWN    = 1800;
+const BLINK_THR   = 0.15;
+const BLINK_FRAMES= 6;
+const BLINK_COOL  = 2000;
+
+// ── 상태 ──
+let lastFired  = 0;
+let lastBlink  = 0;
+let blinkCount = 0;
+let wasBlinking= false;
+let isMoving   = false;
+let movingTimer= null;
+let curDir     = 'center';
+let ttsReady   = false;
+
+const sText   = document.getElementById('sText');
+const btnBird = document.getElementById('btnBird');
+const btnCat  = document.getElementById('btnCat');
+const btnBall = document.getElementById('btnBall');
+const blinkFill=document.getElementById('blinkFill');
+const camDot  = document.getElementById('camDot');
+const camLabel= document.getElementById('camLabel');
+const overlay = document.getElementById('overlay');
+const toastBox= document.getElementById('toastBox');
+const tEmoji  = document.getElementById('tEmoji');
+const tLabel  = document.getElementById('tLabel');
+
+// ── TTS ──
+function initTTS() {
+  if (ttsReady || !window.speechSynthesis) return;
+  speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+  ttsReady = true;
+}
+function speak(text) {
+  if (!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  setTimeout(() => {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang='ko-KR'; u.rate=0.85; u.volume=1;
+    const voices = speechSynthesis.getVoices();
+    const ko = voices.find(v=>v.lang==='ko-KR') || voices.find(v=>v.lang.startsWith('ko'));
+    if (ko) u.voice=ko;
+    u.onstart=()=>sText.classList.add('on');
+    u.onend=()=>sText.classList.remove('on');
+    speechSynthesis.speak(u);
+  }, 150);
+}
+speechSynthesis && speechSynthesis.addEventListener('voiceschanged', ()=>speechSynthesis.getVoices());
+
+// ── 토스트 ──
+let toastTimer=null;
+function showToast(emoji, label) {
+  tEmoji.textContent=emoji; tLabel.textContent=label;
+  toastBox.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>toastBox.classList.remove('show'), 1000);
+}
+
+// ── 선택 ──
+function selectItem(btn, emoji, label, say) {
+  const now = Date.now();
+  if (now - lastFired < COOLDOWN) return;
+  lastFired = now;
+  sText.textContent = label;
+  btn.classList.add('fired');
+  setTimeout(()=>btn.classList.remove('fired'), 400);
+  showToast(emoji, label);
+  speak(say);
+  navigator.vibrate && navigator.vibrate([80,30,80]);
+}
+
+// ── 거리 / EAR / Yaw ──
+function dist(a,b){return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2);}
+function calcEAR(lm){
+  const p1=lm[362],p2=lm[385],p3=lm[387],p4=lm[263],p5=lm[373],p6=lm[380];
+  return (dist(p2,p6)+dist(p3,p5))/(2*dist(p1,p4));
+}
+function calcYaw(lm){
+  const nose=lm[1],right=lm[234],left=lm[454];
+  const width=left.x-right.x;
+  if(Math.abs(width)<0.01) return 0.5;
+  return 1-(nose.x-right.x)/width;
+}
+
+// ── 결과 처리 ──
+function onResults(results) {
+  if (!results.multiFaceLandmarks || !results.multiFaceLandmarks.length) return;
+  const lm = results.multiFaceLandmarks[0];
+  const yaw = calcYaw(lm);
+  const ear = calcEAR(lm);
+
+  // 고개 방향
+  if (yaw < YAW_LEFT) {
+    btnBird.classList.add('active');
+    btnCat.classList.remove('active');
+    isMoving=true; clearTimeout(movingTimer);
+    movingTimer=setTimeout(()=>{ isMoving=false; }, 500);
+    if (curDir !== 'left') { curDir='left'; selectItem(btnBird,'🐦','새','새'); }
+  } else if (yaw > YAW_RIGHT) {
+    btnCat.classList.add('active');
+    btnBird.classList.remove('active');
+    isMoving=true; clearTimeout(movingTimer);
+    movingTimer=setTimeout(()=>{ isMoving=false; }, 500);
+    if (curDir !== 'right') { curDir='right'; selectItem(btnCat,'🐱','고양이','고양이'); }
+  } else {
+    btnBird.classList.remove('active');
+    btnCat.classList.remove('active');
+    curDir='center';
+  }
+
+  // 눈 깜빡임 → 공
+  const earPct=Math.max(0,Math.min(100,(1-ear/0.4)*100));
+  blinkFill.style.height=earPct+'%';
+
+  if (ear < BLINK_THR) {
+    blinkCount++; wasBlinking=true;
+  } else {
+    if (wasBlinking && blinkCount>=BLINK_FRAMES && blinkCount<25 && !isMoving) {
+      const now=Date.now();
+      if (now-lastBlink > BLINK_COOL) {
+        lastBlink=now;
+        selectItem(btnBall,'⚽','공','공');
+      }
+    }
+    blinkCount=0; wasBlinking=false;
+  }
+}
+
+// ── MediaPipe 초기화 ──
+async function init() {
+  const video=document.getElementById('video');
+  const canvas=document.getElementById('canvas');
+  const ovMsg=document.getElementById('ovMsg');
+  const ovSub=document.getElementById('ovSub');
+  const ovBtn=document.getElementById('ovBtn');
+  const ovSpinner=document.getElementById('ovSpinner');
+
+  const timeout=setTimeout(()=>{ovBtn.style.display='block'; ovSub.textContent='로딩 실패. 다시 시도해주세요.';},20000);
+
+  ovMsg.textContent='카메라 연결 중...';
+  try {
+    const stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user',width:640,height:480},audio:false});
+    video.srcObject=stream; await video.play();
+  } catch(e) {
+    clearTimeout(timeout);
+    ovMsg.textContent='카메라 접근 실패';
+    ovSub.innerHTML='Chrome 주소창 🔒 → 카메라 허용 → 새로고침';
+    ovSpinner.style.display='none'; ovBtn.style.display='block';
+    return;
+  }
+
+  ovMsg.textContent='AI 모델 로딩 중... (10~30초)';
+  ovSub.textContent='처음 한 번만 다운로드합니다';
+
+  const faceMesh=new FaceMesh({locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${f}`});
+  faceMesh.setOptions({maxNumFaces:1,refineLandmarks:true,minDetectionConfidence:0.6,minTrackingConfidence:0.6});
+  faceMesh.onResults(onResults);
+
+  const ctx=canvas.getContext('2d');
+  try{canvas.width=1;canvas.height=1;await faceMesh.send({image:canvas});}catch(e){}
+
+  const startLoop=()=>{
+    clearTimeout(timeout);
+    overlay.style.display='none';
+    camDot.className='cam-dot ok';
+    camLabel.textContent='카메라 연결됨';
+    initTTS();
+    async function loop(){
+      if(video.readyState>=2){
+        canvas.width=video.videoWidth||640;canvas.height=video.videoHeight||480;
+        ctx.drawImage(video,0,0);
+        try{await faceMesh.send({image:canvas});}catch(e){}
+      }
+      requestAnimationFrame(loop);
+    }
+    loop();
+  };
+
+  if(video.readyState>=2) startLoop();
+  else{video.addEventListener('canplay',startLoop,{once:true});video.addEventListener('loadeddata',startLoop,{once:true});}
+}
+
+window.addEventListener('load',()=>{
+  if(typeof FaceMesh!=='undefined') init();
+  else{
+    document.getElementById('ovMsg').textContent='인터넷 연결 필요';
+    document.getElementById('ovSub').textContent='새로고침해주세요';
+    document.getElementById('ovBtn').style.display='block';
+  }
+});
+</script>
+</body>
+</html>

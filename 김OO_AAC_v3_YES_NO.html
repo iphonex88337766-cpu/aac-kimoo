@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>AAC - 네/아니오</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body {
+  width:100%; height:100%; overflow:hidden;
+  background:#0d1117;
+  font-family:-apple-system,'Apple SD Gothic Neo',sans-serif;
+  user-select:none; -webkit-user-select:none;
+}
+body {
+  display:flex; flex-direction:column;
+  height:100vh; height:100dvh;
+  padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0);
+}
+
+header {
+  height:50px; flex-shrink:0;
+  background:#161b22; border-bottom:1.5px solid #30363d;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 20px;
+}
+header h1 { font-size:16px; font-weight:700; color:#58a6ff; }
+.cam-status { display:flex; align-items:center; gap:6px; font-size:12px; color:#8b949e; }
+.cam-dot { width:8px; height:8px; border-radius:50%; background:#484f58; transition:background 0.3s; }
+.cam-dot.ok { background:#238636; box-shadow:0 0 6px #238636; }
+
+.speech-bar {
+  height:44px; flex-shrink:0;
+  background:#161b22; border-bottom:1.5px solid #30363d;
+  display:flex; align-items:center; padding:0 20px; gap:10px;
+}
+.speech-bar .si { font-size:20px; }
+.speech-bar .st { font-size:16px; font-weight:700; color:#8b949e; transition:color 0.2s; }
+.speech-bar .st.on { color:#58a6ff; }
+
+/* 메인 영역 - 좌우 2분할 */
+.main {
+  flex:1; display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px; padding:10px;
+  min-height:0;
+}
+
+.choice-btn {
+  border-radius:24px;
+  border:4px solid transparent;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  transition:all 0.15s;
+  position:relative; overflow:hidden;
+}
+.btn-yes { background:#0d2818; border-color:#30363d; }
+.btn-no  { background:#2d0d0d; border-color:#30363d; }
+
+.choice-btn.active-yes { border-color:#238636; box-shadow:0 0 0 6px rgba(35,134,54,0.4); transform:scale(0.97); }
+.choice-btn.active-no  { border-color:#f85149; box-shadow:0 0 0 6px rgba(248,81,73,0.4); transform:scale(0.97); }
+
+.choice-btn .emoji { font-size:clamp(80px,20vw,160px); line-height:1; margin-bottom:12px; }
+.choice-btn .label { font-size:clamp(28px,7vw,56px); font-weight:900; color:#e6edf3; }
+
+/* 방향 힌트 */
+.hint-left  { position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:24px; opacity:0.3; }
+.hint-right { position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:24px; opacity:0.3; }
+
+.choice-btn.active-yes .hint-left,
+.choice-btn.active-no .hint-right { opacity:1; }
+
+/* 선택 플래시 */
+.choice-btn.fired::after {
+  content:''; position:absolute; inset:0;
+  background:rgba(255,255,255,0.2); border-radius:20px;
+  animation:flash 0.4s ease-out forwards;
+}
+@keyframes flash { from{opacity:1} to{opacity:0} }
+
+footer {
+  height:36px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+}
+footer p { color:#484f58; font-size:13px; }
+
+/* 카메라 */
+#video {
+  position:fixed; bottom:16px; left:16px;
+  width:100px; height:75px; border-radius:8px;
+  border:2px solid #30363d; object-fit:cover;
+  transform:scaleX(-1); z-index:50; opacity:0.85;
+}
+#canvas { display:none; }
+
+/* 오버레이 */
+#overlay {
+  position:fixed; inset:0; z-index:100;
+  background:#0d1117;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center; gap:16px;
+}
+#overlay .ov-icon { font-size:48px; }
+#overlay .ov-msg  { font-size:18px; font-weight:700; color:#e6edf3; }
+#overlay .ov-sub  { font-size:13px; color:#8b949e; text-align:center; line-height:1.6; }
+.spinner { width:36px; height:36px; border-radius:50%; border:3px solid #30363d; border-top-color:#58a6ff; animation:spin 0.8s linear infinite; }
+@keyframes spin { to{transform:rotate(360deg)} }
+#overlay button { background:#58a6ff; color:#0d1117; border:none; border-radius:12px; padding:12px 28px; font-size:16px; font-weight:700; cursor:pointer; display:none; }
+
+/* 토스트 */
+.toast { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:200; }
+.toast-box { background:rgba(22,27,34,0.96); border:2px solid rgba(255,255,255,0.12); border-radius:24px; padding:24px 48px; text-align:center; opacity:0; transform:scale(0.8); transition:opacity 0.15s, transform 0.15s; }
+.toast-box.show { opacity:1; transform:scale(1); }
+.toast-box .t-e { font-size:60px; line-height:1; }
+.toast-box .t-l { font-size:28px; font-weight:900; color:#e6edf3; margin-top:8px; }
+</style>
+</head>
+<body>
+
+<div id="overlay">
+  <div class="ov-icon">📷</div>
+  <div class="ov-msg" id="ovMsg">카메라 준비 중...</div>
+  <div class="ov-sub" id="ovSub">카메라 권한을 허용해주세요</div>
+  <div class="spinner" id="ovSpinner"></div>
+  <button id="ovBtn" onclick="location.reload()">다시 시도</button>
+</div>
+
+<video id="video" playsinline autoplay muted></video>
+<canvas id="canvas"></canvas>
+
+<header>
+  <h1>🌟 AAC · 네 / 아니오</h1>
+  <div class="cam-status">
+    <div class="cam-dot" id="camDot"></div>
+    <span id="camLabel">연결 중</span>
+  </div>
+</header>
+
+<div class="speech-bar">
+  <span class="si">🔊</span>
+  <span class="st" id="sText">고개를 돌려서 선택하세요</span>
+</div>
+
+<div class="main">
+  <div class="choice-btn btn-yes" id="btnYes">
+    <span class="hint-left">◀</span>
+    <span class="emoji">⭕</span>
+    <span class="label">네</span>
+  </div>
+  <div class="choice-btn btn-no" id="btnNo">
+    <span class="emoji">❌</span>
+    <span class="label">아니오</span>
+    <span class="hint-right">▶</span>
+  </div>
+</div>
+
+<footer><p>◀ 왼쪽으로 돌리면 네 · 오른쪽으로 돌리면 아니오 ▶</p></footer>
+
+<div class="toast">
+  <div class="toast-box" id="toastBox">
+    <div class="t-e" id="tEmoji"></div>
+    <div class="t-l" id="tLabel"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/face_mesh.js" crossorigin="anonymous"></script>
+
+<script>
+// ── 파라미터 ──
+const YAW_LEFT    = 0.42;   // 이 값 이하 → 왼쪽 (네)
+const YAW_RIGHT   = 0.58;   // 이 값 이상 → 오른쪽 (아니오)
+const COOLDOWN    = 1800;   // ms
+
+// ── 상태 ──
+let lastFired = 0;
+let ttsReady  = false;
+let curDir    = 'center'; // 'left' | 'right' | 'center'
+
+const sText   = document.getElementById('sText');
+const btnYes  = document.getElementById('btnYes');
+const btnNo   = document.getElementById('btnNo');
+const camDot  = document.getElementById('camDot');
+const camLabel= document.getElementById('camLabel');
+const overlay = document.getElementById('overlay');
+const toastBox= document.getElementById('toastBox');
+const tEmoji  = document.getElementById('tEmoji');
+const tLabel  = document.getElementById('tLabel');
+
+// ── TTS ──
+function initTTS() {
+  if (ttsReady || !window.speechSynthesis) return;
+  speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+  ttsReady = true;
+}
+function speak(text) {
+  if (!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  setTimeout(() => {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ko-KR'; u.rate = 0.85; u.volume = 1;
+    const voices = speechSynthesis.getVoices();
+    const ko = voices.find(v => v.lang === 'ko-KR') || voices.find(v => v.lang.startsWith('ko'));
+    if (ko) u.voice = ko;
+    u.onstart = () => sText.classList.add('on');
+    u.onend   = () => sText.classList.remove('on');
+    speechSynthesis.speak(u);
+  }, 150);
+}
+speechSynthesis && speechSynthesis.addEventListener('voiceschanged', () => speechSynthesis.getVoices());
+
+// ── 토스트 ──
+let toastTimer = null;
+function showToast(emoji, label) {
+  tEmoji.textContent = emoji;
+  tLabel.textContent = label;
+  toastBox.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastBox.classList.remove('show'), 1000);
+}
+
+// ── 선택 ──
+function select(dir) {
+  const now = Date.now();
+  if (now - lastFired < COOLDOWN) return;
+  lastFired = now;
+
+  if (dir === 'left') {
+    sText.textContent = '네';
+    btnYes.classList.add('fired');
+    setTimeout(() => btnYes.classList.remove('fired'), 400);
+    showToast('⭕', '네');
+    speak('네');
+    navigator.vibrate && navigator.vibrate([80,30,80]);
+  } else {
+    sText.textContent = '아니오';
+    btnNo.classList.add('fired');
+    setTimeout(() => btnNo.classList.remove('fired'), 400);
+    showToast('❌', '아니오');
+    speak('아니오');
+    navigator.vibrate && navigator.vibrate([80,30,80]);
+  }
+}
+
+// ── Yaw 계산 ──
+function dist(a,b) { return Math.sqrt((a.x-b.x)**2+(a.y-b.y)**2); }
+function calcYaw(lm) {
+  const nose=lm[1], right=lm[234], left=lm[454];
+  const width = left.x - right.x;
+  if (Math.abs(width) < 0.01) return 0.5;
+  return 1 - (nose.x - right.x) / width;
+}
+
+// ── 결과 처리 ──
+function onResults(results) {
+  if (!results.multiFaceLandmarks || !results.multiFaceLandmarks.length) return;
+  const lm = results.multiFaceLandmarks[0];
+  const yaw = calcYaw(lm);
+
+  if (yaw < YAW_LEFT) {
+    btnYes.classList.add('active-yes');
+    btnNo.classList.remove('active-no');
+    if (curDir !== 'left') { curDir = 'left'; select('left'); }
+  } else if (yaw > YAW_RIGHT) {
+    btnNo.classList.add('active-no');
+    btnYes.classList.remove('active-yes');
+    if (curDir !== 'right') { curDir = 'right'; select('right'); }
+  } else {
+    btnYes.classList.remove('active-yes');
+    btnNo.classList.remove('active-no');
+    curDir = 'center';
+  }
+}
+
+// ── MediaPipe 초기화 ──
+async function init() {
+  const video = document.getElementById('video');
+  const canvas= document.getElementById('canvas');
+  const ovMsg = document.getElementById('ovMsg');
+  const ovSub = document.getElementById('ovSub');
+  const ovBtn = document.getElementById('ovBtn');
+  const ovSpinner = document.getElementById('ovSpinner');
+
+  const timeout = setTimeout(() => { ovBtn.style.display='block'; ovSub.textContent='로딩 실패. 다시 시도해주세요.'; }, 20000);
+
+  ovMsg.textContent = '카메라 연결 중...';
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ video:{facingMode:'user',width:640,height:480}, audio:false });
+    video.srcObject = stream;
+    await video.play();
+  } catch(e) {
+    clearTimeout(timeout);
+    ovMsg.textContent='카메라 접근 실패';
+    ovSub.innerHTML='Chrome 주소창 🔒 → 카메라 허용 → 새로고침';
+    ovSpinner.style.display='none'; ovBtn.style.display='block';
+    return;
+  }
+
+  ovMsg.textContent = 'AI 모델 로딩 중... (10~30초)';
+  ovSub.textContent = '처음 한 번만 다운로드합니다';
+
+  const faceMesh = new FaceMesh({ locateFile: f=>`https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${f}` });
+  faceMesh.setOptions({ maxNumFaces:1, refineLandmarks:true, minDetectionConfidence:0.6, minTrackingConfidence:0.6 });
+  faceMesh.onResults(onResults);
+
+  const ctx = canvas.getContext('2d');
+  try { canvas.width=1; canvas.height=1; await faceMesh.send({image:canvas}); } catch(e) {}
+
+  const startLoop = () => {
+    clearTimeout(timeout);
+    overlay.style.display='none';
+    camDot.className='cam-dot ok';
+    camLabel.textContent='카메라 연결됨';
+    initTTS();
+    async function loop() {
+      if (video.readyState >= 2) {
+        canvas.width=video.videoWidth||640; canvas.height=video.videoHeight||480;
+        ctx.drawImage(video,0,0);
+        try { await faceMesh.send({image:canvas}); } catch(e) {}
+      }
+      requestAnimationFrame(loop);
+    }
+    loop();
+  };
+
+  if (video.readyState >= 2) startLoop();
+  else { video.addEventListener('canplay', startLoop, {once:true}); video.addEventListener('loadeddata', startLoop, {once:true}); }
+}
+
+window.addEventListener('load', () => {
+  if (typeof FaceMesh !== 'undefined') init();
+  else {
+    document.getElementById('ovMsg').textContent='인터넷 연결 필요';
+    document.getElementById('ovSub').textContent='MediaPipe 로딩 실패. 인터넷 연결 후 새로고침';
+    document.getElementById('ovBtn').style.display='block';
+  }
+});
+</script>
+</body>
+</html>
