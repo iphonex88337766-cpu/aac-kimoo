@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>AAC - 김OO (고개+눈)</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+:root {
+  --bg: #0d1117;
+  --card: #161b22;
+  --border: #30363d;
+  --accent: #58a6ff;
+  --green: #238636;
+  --text: #e6edf3;
+  --sub: #8b949e;
+}
+
+html, body {
+  width:100%; height:100%;
+  overflow:hidden;
+  background:var(--bg);
+  font-family:-apple-system,'Apple SD Gothic Neo','Noto Sans KR',sans-serif;
+  color:var(--text);
+  user-select:none; -webkit-user-select:none;
+}
+
+body {
+  display:flex; flex-direction:column;
+  height:100vh; height:100dvh;
+  padding: env(safe-area-inset-top,0px) env(safe-area-inset-right,0px)
+           env(safe-area-inset-bottom,0px) env(safe-area-inset-left,0px);
+}
+
+/* ── 헤더 ── */
+header {
+  height:54px; flex-shrink:0;
+  background:var(--card);
+  border-bottom:1.5px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 20px;
+}
+header h1 { font-size:17px; font-weight:700; color:var(--accent); }
+.cam-status {
+  display:flex; align-items:center; gap:6px;
+  font-size:12px; color:var(--sub);
+}
+.cam-dot {
+  width:8px; height:8px; border-radius:50%;
+  background:#484f58; transition:background 0.3s;
+}
+.cam-dot.ok  { background:#238636; box-shadow:0 0 6px #238636; }
+.cam-dot.err { background:#f85149; }
+
+/* ── 방향 인디케이터 ── */
+.dir-bar {
+  height:48px; flex-shrink:0;
+  background:var(--card);
+  border-bottom:1.5px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between;
+  padding:0 24px;
+}
+.dir-arrow {
+  font-size:22px; opacity:0.2;
+  transition:opacity 0.15s, transform 0.15s;
+}
+.dir-arrow.active { opacity:1; transform:scale(1.3); }
+
+.head-meter {
+  flex:1; height:6px; background:#21262d;
+  border-radius:3px; margin:0 16px;
+  position:relative; overflow:visible;
+}
+.head-needle {
+  position:absolute;
+  top:50%; transform:translate(-50%,-50%);
+  width:14px; height:14px; border-radius:50%;
+  background:var(--sub);
+  transition:left 0.1s, background 0.1s;
+}
+.head-needle.left  { background:#58a6ff; }
+.head-needle.right { background:#58a6ff; }
+
+/* ── 메인 심볼 영역 ── */
+.symbol-area {
+  flex:1; display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  padding:20px;
+  min-height:0;
+  position:relative;
+  overflow:hidden;
+}
+
+.symbol-card {
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  width:100%; flex:1;
+  border-radius:28px;
+  border:4px solid transparent;
+  transition:border-color 0.2s, box-shadow 0.2s;
+  position:relative;
+  overflow:hidden;
+}
+
+/* 버튼 색 */
+.c-green  { background:#0d2818; }
+.c-red    { background:#2d0d0d; }
+.c-blue   { background:#0d1e3a; }
+.c-orange { background:#2d1b00; }
+
+.c-green.selected  { border-color:#238636; box-shadow:0 0 0 4px rgba(35,134,54,0.3); }
+.c-red.selected    { border-color:#f85149; box-shadow:0 0 0 4px rgba(248,81,73,0.3); }
+.c-blue.selected   { border-color:#58a6ff; box-shadow:0 0 0 4px rgba(88,166,255,0.3); }
+.c-orange.selected { border-color:#d29922; box-shadow:0 0 0 4px rgba(210,153,34,0.3); }
+
+.symbol-card .emoji {
+  font-size:clamp(80px,20vw,150px);
+  line-height:1; margin-bottom:12px;
+  pointer-events:none;
+}
+@media (orientation:landscape) {
+  .symbol-card .emoji { font-size:clamp(60px,14vh,100px); }
+}
+.symbol-card .label {
+  font-size:clamp(28px,7vw,52px);
+  font-weight:900; letter-spacing:-0.5px;
+  pointer-events:none;
+}
+@media (orientation:landscape) {
+  .symbol-card .label { font-size:clamp(22px,5vh,40px); }
+}
+
+/* 선택 플래시 */
+.symbol-card.fired::after {
+  content:'';
+  position:absolute; inset:0;
+  background:rgba(255,255,255,0.2);
+  border-radius:24px;
+  animation:flash 0.4s ease-out forwards;
+}
+@keyframes flash { from{opacity:1} to{opacity:0} }
+
+/* ── 점 인디케이터 ── */
+.dots {
+  display:flex; gap:10px;
+  padding:12px 0 6px;
+  flex-shrink:0;
+}
+.dot {
+  width:10px; height:10px; border-radius:50%;
+  background:#30363d; transition:background 0.2s, transform 0.2s;
+}
+.dot.on { background:var(--accent); transform:scale(1.3); }
+
+/* ── 푸터 ── */
+footer {
+  height:38px; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center;
+}
+footer p { color:#484f58; font-size:13px; }
+
+/* ── 카메라 (숨김, 감지용) ── */
+#video { display:none; }
+#canvas { display:none; }
+
+/* ── 눈깜빡임 게이지 ── */
+.blink-bar {
+  position:absolute; bottom:16px; right:16px;
+  width:14px; height:60px;
+  background:#21262d; border-radius:7px; overflow:hidden;
+}
+.blink-fill {
+  position:absolute; bottom:0; width:100%;
+  background:var(--accent); border-radius:7px;
+  transition:height 0.05s;
+  height:0%;
+}
+
+/* ── 로딩 오버레이 ── */
+#overlay {
+  position:fixed; inset:0; z-index:100;
+  background:#0d1117;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+  gap:16px;
+}
+#overlay .ov-icon { font-size:48px; }
+#overlay .ov-msg  { font-size:18px; font-weight:700; color:var(--text); text-align:center; }
+#overlay .ov-sub  { font-size:13px; color:var(--sub); text-align:center; line-height:1.6; }
+.spinner {
+  width:36px; height:36px; border-radius:50%;
+  border:3px solid #30363d;
+  border-top-color:var(--accent);
+  animation:spin 0.8s linear infinite;
+}
+@keyframes spin { to{transform:rotate(360deg)} }
+#overlay button {
+  margin-top:8px;
+  background:var(--accent); color:#0d1117;
+  border:none; border-radius:12px;
+  padding:12px 28px; font-size:16px; font-weight:700;
+  cursor:pointer;
+}
+
+/* ── 토스트 ── */
+.toast {
+  position:fixed; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  pointer-events:none; z-index:200;
+}
+.toast-box {
+  background:rgba(22,27,34,0.96);
+  border:2px solid rgba(255,255,255,0.12);
+  border-radius:24px; padding:24px 48px;
+  text-align:center;
+  opacity:0; transform:scale(0.8);
+  transition:opacity 0.15s, transform 0.15s;
+}
+.toast-box.show { opacity:1; transform:scale(1); }
+.toast-box .t-e { font-size:60px; line-height:1; }
+.toast-box .t-l { font-size:28px; font-weight:900; margin-top:8px; }
+
+/* ── 음성 표시 ── */
+.speech-bar {
+  height:44px; flex-shrink:0;
+  background:var(--card);
+  border-bottom:1.5px solid var(--border);
+  display:flex; align-items:center;
+  padding:0 20px; gap:10px;
+}
+.speech-bar .si { font-size:20px; }
+.speech-bar .st { font-size:16px; font-weight:700; color:var(--sub); transition:color 0.2s; }
+.speech-bar .st.on { color:var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- 로딩 오버레이 -->
+<div id="overlay">
+  <div class="ov-icon">📷</div>
+  <div class="ov-msg">카메라 준비 중...</div>
+  <div class="ov-sub">카메라 권한을 허용해주세요<br>iPad 정면 카메라를 사용합니다</div>
+  <div class="spinner"></div>
+</div>
+
+<!-- 감지용 (숨김) -->
+<video id="video" playsinline autoplay muted></video>
+<canvas id="canvas"></canvas>
+
+<!-- ── 헤더 ── -->
+<header>
+  <h1>🌟 AAC · 김OO</h1>
+  <div class="cam-status">
+    <div class="cam-dot" id="camDot"></div>
+    <span id="camLabel">연결 중</span>
+  </div>
+</header>
+
+<!-- ── 음성 표시 ── -->
+<div class="speech-bar">
+  <span class="si">🔊</span>
+  <span class="st" id="sText">선택 대기 중</span>
+</div>
+
+<!-- ── 방향 인디케이터 ── -->
+<div class="dir-bar">
+  <span class="dir-arrow" id="arrLeft">◀ 왼쪽</span>
+  <div class="head-meter">
+    <div class="head-needle" id="needle"></div>
+  </div>
+  <span class="dir-arrow" id="arrRight">오른쪽 ▶</span>
+</div>
+
+<!-- ── 심볼 ── -->
+<div class="symbol-area">
+  <div class="symbol-card" id="symCard">
+    <span class="emoji" id="symEmoji">😊</span>
+    <span class="label" id="symLabel">좋아요</span>
+  </div>
+
+  <!-- 눈깜빡임 게이지 -->
+  <div class="blink-bar">
+    <div class="blink-fill" id="blinkFill"></div>
+  </div>
+</div>
+
+<!-- ── 점 인디케이터 ── -->
+<div class="dots" id="dots">
+  <div class="dot on"></div>
+  <div class="dot"></div>
+  <div class="dot"></div>
+  <div class="dot"></div>
+</div>
+
+<!-- ── 푸터 ── -->
+<footer><p>👁 눈 깜빡이면 선택 · 고개 좌우로 이동</p></footer>
+
+<!-- ── 토스트 ── -->
+<div class="toast">
+  <div class="toast-box" id="toastBox">
+    <div class="t-e" id="tEmoji"></div>
+    <div class="t-l" id="tLabel"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/face_mesh.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3/camera_utils.js" crossorigin="anonymous"></script>
+
+<script>
+// ══════════════════════════════════════════
+// 심볼 데이터
+// ══════════════════════════════════════════
+const SYMBOLS = [
+  { emoji:'😊', label:'좋아요',     say:'좋아요',     color:'c-green'  },
+  { emoji:'🙅', label:'싫어요',     say:'싫어요',     color:'c-red'    },
+  { emoji:'🙏', label:'도와주세요', say:'도와주세요', color:'c-blue'   },
+  { emoji:'😴', label:'쉬고 싶어요',say:'쉬고 싶어요',color:'c-orange' },
+];
+
+// ══════════════════════════════════════════
+// 파라미터 (필요시 조정)
+// ══════════════════════════════════════════
+const HEAD_LEFT_THR   = 0.43;  // 이 값 이하 → 왼쪽 회전
+const HEAD_RIGHT_THR  = 0.57;  // 이 값 이상 → 오른쪽 회전
+const HEAD_COOLDOWN   = 900;   // ms - 연속 이동 방지
+const BLINK_THR       = 0.22;  // EAR 임계값
+const BLINK_FRAMES    = 3;     // 연속 N프레임 이하 = 깜빡임
+const BLINK_COOLDOWN  = 1500;  // ms - 연속 선택 방지
+
+// ══════════════════════════════════════════
+// 상태
+// ══════════════════════════════════════════
+let curIdx      = 0;
+let lastHead    = 0;
+let lastBlink   = 0;
+let blinkCount  = 0;  // 연속으로 EAR 낮은 프레임 수
+let wasBlinking = false;
+let ttsReady    = false;
+
+// DOM
+const overlay   = document.getElementById('overlay');
+const camDot    = document.getElementById('camDot');
+const camLabel  = document.getElementById('camLabel');
+const symCard   = document.getElementById('symCard');
+const symEmoji  = document.getElementById('symEmoji');
+const symLabel  = document.getElementById('symLabel');
+const sText     = document.getElementById('sText');
+const needle    = document.getElementById('needle');
+const arrLeft   = document.getElementById('arrLeft');
+const arrRight  = document.getElementById('arrRight');
+const blinkFill = document.getElementById('blinkFill');
+const toastBox  = document.getElementById('toastBox');
+const tEmoji    = document.getElementById('tEmoji');
+const tLabel    = document.getElementById('tLabel');
+const dotsEl    = document.getElementById('dots');
+
+// ══════════════════════════════════════════
+// UI 업데이트
+// ══════════════════════════════════════════
+function renderSymbol() {
+  const s = SYMBOLS[curIdx];
+  symEmoji.textContent = s.emoji;
+  symLabel.textContent = s.label;
+  symCard.className = `symbol-card selected ${s.color}`;
+
+  const dotList = dotsEl.querySelectorAll('.dot');
+  dotList.forEach((d,i) => d.classList.toggle('on', i === curIdx));
+}
+
+renderSymbol();
+
+// ══════════════════════════════════════════
+// TTS
+// ══════════════════════════════════════════
+function initTTS() {
+  if (ttsReady || !window.speechSynthesis) return;
+  const u = new SpeechSynthesisUtterance('');
+  u.volume = 0;
+  speechSynthesis.speak(u);
+  ttsReady = true;
+}
+
+function speak(text) {
+  if (!window.speechSynthesis) return;
+  speechSynthesis.cancel();
+  setTimeout(() => {
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = 'ko-KR'; u.rate = 0.85; u.pitch = 1; u.volume = 1;
+    const voices = speechSynthesis.getVoices();
+    const ko = voices.find(v => v.lang === 'ko-KR') || voices.find(v => v.lang.startsWith('ko'));
+    if (ko) u.voice = ko;
+    u.onstart = () => { sText.classList.add('on'); };
+    u.onend   = () => { sText.classList.remove('on'); };
+    speechSynthesis.speak(u);
+  }, 80);
+}
+
+speechSynthesis && speechSynthesis.addEventListener('voiceschanged', () => speechSynthesis.getVoices());
+
+// ══════════════════════════════════════════
+// 토스트
+// ══════════════════════════════════════════
+let toastTimer = null;
+function showToast(emoji, label) {
+  tEmoji.textContent = emoji;
+  tLabel.textContent = label;
+  toastBox.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toastBox.classList.remove('show'), 1000);
+}
+
+// ══════════════════════════════════════════
+// 선택 실행
+// ══════════════════════════════════════════
+function selectCurrent() {
+  const now = Date.now();
+  if (now - lastBlink < BLINK_COOLDOWN) return;
+  lastBlink = now;
+
+  const s = SYMBOLS[curIdx];
+  sText.textContent = s.label;
+  showToast(s.emoji, s.label);
+  speak(s.say);
+  navigator.vibrate && navigator.vibrate([80,30,80]);
+
+  symCard.classList.add('fired');
+  setTimeout(() => symCard.classList.remove('fired'), 400);
+}
+
+// ══════════════════════════════════════════
+// 고개 이동
+// ══════════════════════════════════════════
+function moveLeft() {
+  const now = Date.now();
+  if (now - lastHead < HEAD_COOLDOWN) return;
+  lastHead = now;
+  curIdx = (curIdx - 1 + SYMBOLS.length) % SYMBOLS.length;
+  renderSymbol();
+}
+
+function moveRight() {
+  const now = Date.now();
+  if (now - lastHead < HEAD_COOLDOWN) return;
+  lastHead = now;
+  curIdx = (curIdx + 1) % SYMBOLS.length;
+  renderSymbol();
+}
+
+// ══════════════════════════════════════════
+// 거리 계산 (MediaPipe normalized coords)
+// ══════════════════════════════════════════
+function dist(a, b) {
+  return Math.sqrt((a.x-b.x)**2 + (a.y-b.y)**2);
+}
+
+// ══════════════════════════════════════════
+// EAR 계산 (Eye Aspect Ratio)
+// 오른쪽 눈 (사용자 기준) landmark indices:
+// 362(외), 385(상외), 387(상내), 263(내), 373(하내), 380(하외)
+// ══════════════════════════════════════════
+function calcEAR(lm) {
+  const p1 = lm[362]; // outer
+  const p2 = lm[385]; // upper outer
+  const p3 = lm[387]; // upper inner
+  const p4 = lm[263]; // inner
+  const p5 = lm[373]; // lower inner
+  const p6 = lm[380]; // lower outer
+
+  const ear = (dist(p2,p6) + dist(p3,p5)) / (2 * dist(p1,p4));
+  return ear;
+}
+
+// ══════════════════════════════════════════
+// 고개 요 계산
+// landmark 1 = 코끝, 234 = 오른쪽 얼굴 윤곽, 454 = 왼쪽 얼굴 윤곽
+// ratio = (nose.x - right.x) / (left.x - right.x)
+// 정면: ~0.5 / 왼쪽 회전: > 0.57 / 오른쪽 회전: < 0.43
+// ══════════════════════════════════════════
+function calcYaw(lm) {
+  const nose  = lm[1];
+  const right = lm[234];
+  const left  = lm[454];
+  const width = left.x - right.x;
+  if (Math.abs(width) < 0.01) return 0.5;
+  return (nose.x - right.x) / width;
+}
+
+// ══════════════════════════════════════════
+// MediaPipe 결과 처리
+// ══════════════════════════════════════════
+function onResults(results) {
+  if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) return;
+
+  const lm = results.multiFaceLandmarks[0];
+
+  // ── 고개 요 ──
+  const yaw = calcYaw(lm);
+
+  // 바늘 UI (0~1 → 10%~90%)
+  const pct = Math.min(Math.max(yaw * 100, 5), 95);
+  needle.style.left = pct + '%';
+
+  if (yaw < HEAD_LEFT_THR) {
+    // 오른쪽 회전 (카메라 기준 왼쪽으로 코가 이동)
+    needle.className = 'head-needle right';
+    arrRight.classList.add('active');
+    arrLeft.classList.remove('active');
+    moveRight();
+  } else if (yaw > HEAD_RIGHT_THR) {
+    // 왼쪽 회전
+    needle.className = 'head-needle left';
+    arrLeft.classList.add('active');
+    arrRight.classList.remove('active');
+    moveLeft();
+  } else {
+    needle.className = 'head-needle';
+    arrLeft.classList.remove('active');
+    arrRight.classList.remove('active');
+  }
+
+  // ── 눈 깜빡임 ──
+  const ear = calcEAR(lm);
+  const earPct = Math.max(0, Math.min(100, (1 - ear / 0.4) * 100));
+  blinkFill.style.height = earPct + '%';
+
+  if (ear < BLINK_THR) {
+    blinkCount++;
+    wasBlinking = true;
+  } else {
+    // 눈 뜨는 순간 (wasBlinking=true → false 전환)
+    if (wasBlinking && blinkCount >= BLINK_FRAMES && blinkCount < 20) {
+      // 너무 짧거나 너무 길면 무시 (불수의 눈 움직임 방지)
+      selectCurrent();
+    }
+    blinkCount = 0;
+    wasBlinking = false;
+  }
+}
+
+// ══════════════════════════════════════════
+// MediaPipe 초기화
+// ══════════════════════════════════════════
+async function initMediaPipe() {
+  const video  = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+
+  // 카메라 스트림
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width:640, height:480 },
+      audio: false
+    });
+    video.srcObject = stream;
+    await video.play();
+  } catch(e) {
+    overlay.innerHTML = `
+      <div class="ov-icon">⚠️</div>
+      <div class="ov-msg">카메라 접근 실패</div>
+      <div class="ov-sub">Safari 설정 → 카메라 권한을 허용해주세요<br>그 후 페이지를 다시 열어주세요</div>
+      <button onclick="location.reload()">다시 시도</button>
+    `;
+    return;
+  }
+
+  // Face Mesh
+  const faceMesh = new FaceMesh({
+    locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${f}`
+  });
+
+  faceMesh.setOptions({
+    maxNumFaces: 1,
+    refineLandmarks: true,
+    minDetectionConfidence: 0.6,
+    minTrackingConfidence: 0.6,
+  });
+
+  faceMesh.onResults(onResults);
+
+  // 프레임 루프
+  const ctx = canvas.getContext('2d');
+  async function loop() {
+    canvas.width  = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    await faceMesh.send({ image: canvas });
+    requestAnimationFrame(loop);
+  }
+
+  video.addEventListener('loadeddata', async () => {
+    // 오버레이 제거
+    overlay.style.display = 'none';
+    camDot.className   = 'cam-dot ok';
+    camLabel.textContent = '카메라 연결됨';
+    initTTS();
+    loop();
+  });
+}
+
+// FaceMesh CDN 로드 후 실행
+window.addEventListener('load', () => {
+  if (typeof FaceMesh !== 'undefined') {
+    initMediaPipe();
+  } else {
+    // CDN 로드 실패 시 폴백
+    overlay.innerHTML = `
+      <div class="ov-icon">📶</div>
+      <div class="ov-msg">인터넷 연결 필요</div>
+      <div class="ov-sub">MediaPipe 로딩 실패<br>인터넷 연결 후 다시 시도해주세요</div>
+      <button onclick="location.reload()">다시 시도</button>
+    `;
+  }
+});
+
+// 방향 매핑 확인용 (치료사가 테스트 시 사용)
+// 고개를 오른쪽으로 돌리면 오른쪽 심볼로 이동
+// 맞지 않으면 아래 줄 HEAD_LEFT/RIGHT_THR 반대로 조정
+</script>
+</body>
+</html>
