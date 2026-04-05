@@ -189,26 +189,61 @@ const tEmoji  = document.getElementById('tEmoji');
 const tLabel  = document.getElementById('tLabel');
 
 // ── TTS ──
+let koVoice = null;
+
+function loadVoices() {
+  const voices = speechSynthesis.getVoices();
+  koVoice = voices.find(v => v.lang === 'ko-KR' && v.localService) ||
+            voices.find(v => v.lang === 'ko-KR') ||
+            voices.find(v => v.lang.startsWith('ko')) ||
+            null;
+}
+
+if (window.speechSynthesis) {
+  loadVoices();
+  speechSynthesis.addEventListener('voiceschanged', loadVoices);
+  // Chrome TTS 버그 방지: 주기적으로 resume 호출
+  setInterval(() => {
+    if (speechSynthesis.paused) speechSynthesis.resume();
+  }, 5000);
+}
+
 function initTTS() {
   if (ttsReady || !window.speechSynthesis) return;
-  speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+  const u = new SpeechSynthesisUtterance('');
+  u.volume = 0;
+  speechSynthesis.speak(u);
   ttsReady = true;
 }
+
 function speak(text) {
   if (!window.speechSynthesis) return;
+  // Chrome stuck 방지
   speechSynthesis.cancel();
   setTimeout(() => {
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ko-KR'; u.rate = 0.85; u.volume = 1;
-    const voices = speechSynthesis.getVoices();
-    const ko = voices.find(v => v.lang === 'ko-KR') || voices.find(v => v.lang.startsWith('ko'));
-    if (ko) u.voice = ko;
+    u.lang = 'ko-KR';
+    u.rate = 0.85;
+    u.pitch = 1;
+    u.volume = 1;
+    if (koVoice) u.voice = koVoice;
     u.onstart = () => sText.classList.add('on');
-    u.onend   = () => sText.classList.remove('on');
+    u.onend   = () => { sText.classList.remove('on'); };
+    u.onerror = (e) => {
+      sText.classList.remove('on');
+      // 오류시 300ms 후 재시도 1회
+      setTimeout(() => {
+        const u2 = new SpeechSynthesisUtterance(text);
+        u2.lang = 'ko-KR'; u2.rate = 0.85; u2.volume = 1;
+        if (koVoice) u2.voice = koVoice;
+        u2.onstart = () => sText.classList.add('on');
+        u2.onend   = () => sText.classList.remove('on');
+        speechSynthesis.speak(u2);
+      }, 300);
+    };
     speechSynthesis.speak(u);
-  }, 150);
+  }, 200);
 }
-speechSynthesis && speechSynthesis.addEventListener('voiceschanged', () => speechSynthesis.getVoices());
 
 // ── 토스트 ──
 let toastTimer = null;
