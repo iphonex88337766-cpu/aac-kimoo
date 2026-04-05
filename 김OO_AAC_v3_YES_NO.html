@@ -189,19 +189,9 @@ const toastBox= document.getElementById('toastBox');
 const tEmoji  = document.getElementById('tEmoji');
 const tLabel  = document.getElementById('tLabel');
 
-// ── TTS (iPad Safari 디버그 + 완전 수정 버전) ──
+// ── TTS ──
 let ttsVoice = null;
 let ttsInitialized = false;
-
-// 디버그 패널
-const dbg = document.createElement('div');
-dbg.style.cssText = 'position:fixed;top:55px;right:8px;background:rgba(0,0,0,0.8);color:#0f0;font-size:10px;padding:6px 8px;border-radius:6px;z-index:999;line-height:1.7;max-width:180px;pointer-events:none;';
-document.body.appendChild(dbg);
-
-function dbgUpdate(msg) {
-  const v = window.speechSynthesis ? speechSynthesis.getVoices() : [];
-  dbg.innerHTML = 'voices: ' + v.length + '<br>voice: ' + (ttsVoice ? ttsVoice.name.slice(0,15) : 'none') + '<br>ready: ' + ttsInitialized + '<br>last: ' + msg;
-}
 
 function pickVoice() {
   const v = speechSynthesis.getVoices();
@@ -209,44 +199,30 @@ function pickVoice() {
           || v.find(x => x.lang === 'ko-KR')
           || v.find(x => x.lang.startsWith('ko'))
           || (v.length ? v[0] : null);
-  dbgUpdate('pickVoice');
 }
 
 function initTTS() {
-  if (ttsInitialized) return;
+  if (ttsInitialized || !window.speechSynthesis) return;
   ttsInitialized = true;
-  if (!window.speechSynthesis) { dbgUpdate('NO speechSynthesis'); return; }
   pickVoice();
   speechSynthesis.onvoiceschanged = pickVoice;
-  dbgUpdate('initTTS OK');
 }
 
 function speakText(text) {
-  if (!window.speechSynthesis) { dbgUpdate('NO SYN'); return; }
+  if (!window.speechSynthesis) return;
   speechSynthesis.cancel();
   setTimeout(() => {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = 'ko-KR'; u.rate = 0.85; u.volume = 1;
     if (ttsVoice) u.voice = ttsVoice;
-    u.onstart = () => { sText.classList.add('on'); dbgUpdate('speaking:' + text); };
-    u.onend   = () => { sText.classList.remove('on'); dbgUpdate('done:' + text); };
-    u.onerror = (e) => { sText.classList.remove('on'); dbgUpdate('ERR:' + e.error); };
+    u.onstart = () => sText.classList.add('on');
+    u.onend   = () => sText.classList.remove('on');
+    u.onerror = () => sText.classList.remove('on');
     speechSynthesis.speak(u);
-    dbgUpdate('speak() called');
   }, 100);
 }
 
 function speak(text) { speakText(text); }
-function initTTSLegacy() { initTTS(); }
-
-// TTS 테스트 버튼
-setTimeout(() => {
-  const btn = document.createElement('button');
-  btn.textContent = 'TTS 테스트';
-  btn.style.cssText = 'position:fixed;bottom:50px;right:8px;z-index:999;background:#58a6ff;color:#000;border:none;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;';
-  btn.addEventListener('click', () => { initTTS(); speakText('네'); });
-  document.body.appendChild(btn);
-}, 500);
 
 // ── 토스트 ──
 let toastTimer = null;
