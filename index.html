@@ -333,8 +333,8 @@ const SYMBOLS = [
 // ══════════════════════════════════════════
 // 파라미터 (필요시 조정)
 // ══════════════════════════════════════════
-const HEAD_LEFT_THR   = 0.57;  // 이 값 이상 → 왼쪽 회전 (반전)
-const HEAD_RIGHT_THR  = 0.43;  // 이 값 이하 → 오른쪽 회전 (반전)
+const HEAD_LEFT_THR   = 0.42;  // 이 값 이하 → 왼쪽으로 이동
+const HEAD_RIGHT_THR  = 0.58;  // 이 값 이상 → 오른쪽으로 이동
 const HEAD_COOLDOWN   = 900;   // ms - 연속 이동 방지
 const BLINK_THR       = 0.15;  // EAR 임계값 (덜 민감하게)
 const BLINK_FRAMES    = 6;     // 연속 N프레임 이상 감겨야 (덜 민감)
@@ -348,6 +348,8 @@ let lastHead    = 0;
 let lastBlink   = 0;
 let blinkCount  = 0;  // 연속으로 EAR 낮은 프레임 수
 let wasBlinking = false;
+let isMoving    = false; // 고개 움직이는 동안 깜빡임 무시용
+let movingTimer = null;
 let ttsReady    = false;
 
 // DOM
@@ -523,16 +525,22 @@ function onResults(results) {
   needle.style.left = pct + '%';
 
   if (yaw < HEAD_LEFT_THR) {
-    // 오른쪽 회전 (카메라 기준 왼쪽으로 코가 이동)
+    // 오른쪽으로 이동
     needle.className = 'head-needle right';
     arrRight.classList.add('active');
     arrLeft.classList.remove('active');
+    isMoving = true;
+    clearTimeout(movingTimer);
+    movingTimer = setTimeout(() => { isMoving = false; }, 500);
     moveRight();
   } else if (yaw > HEAD_RIGHT_THR) {
-    // 왼쪽 회전
+    // 왼쪽으로 이동
     needle.className = 'head-needle left';
     arrLeft.classList.add('active');
     arrRight.classList.remove('active');
+    isMoving = true;
+    clearTimeout(movingTimer);
+    movingTimer = setTimeout(() => { isMoving = false; }, 500);
     moveLeft();
   } else {
     needle.className = 'head-needle';
@@ -549,9 +557,8 @@ function onResults(results) {
     blinkCount++;
     wasBlinking = true;
   } else {
-    // 눈 뜨는 순간 (wasBlinking=true → false 전환)
-    if (wasBlinking && blinkCount >= BLINK_FRAMES && blinkCount < 20) {
-      // 너무 짧거나 너무 길면 무시 (불수의 눈 움직임 방지)
+    // 눈 뜨는 순간 - isMoving이면 무시 (고개 돌리는 중 깜빡임 차단)
+    if (wasBlinking && blinkCount >= BLINK_FRAMES && blinkCount < 25 && !isMoving) {
       selectCurrent();
     }
     blinkCount = 0;
