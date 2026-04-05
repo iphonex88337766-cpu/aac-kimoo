@@ -506,7 +506,8 @@ function calcYaw(lm) {
   const left  = lm[454];
   const width = left.x - right.x;
   if (Math.abs(width) < 0.01) return 0.5;
-  return (nose.x - right.x) / width;
+  // 카메라 미러 반전 보정: 1에서 빼서 좌우 뒤집기
+  return 1 - (nose.x - right.x) / width;
 }
 
 // ══════════════════════════════════════════
