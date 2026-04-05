@@ -113,7 +113,7 @@ footer p { color:#484f58; font-size:13px; }
 .toast { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; z-index:200; }
 .toast-box { background:rgba(22,27,34,0.96); border:2px solid rgba(255,255,255,0.12); border-radius:24px; padding:24px 48px; text-align:center; opacity:0; transform:scale(0.8); transition:opacity 0.15s, transform 0.15s; }
 .toast-box.show { opacity:1; transform:scale(1); }
-.toast-box .t-e { font-size:60px; line-height:1; }
+.toast-box .t-e { font-size:60px; line-height:1; color:#2ea043; font-weight:900; font-family:sans-serif; }
 .toast-box .t-l { font-size:28px; font-weight:900; color:#e6edf3; margin-top:8px; }
 </style>
 </head>
@@ -146,11 +146,11 @@ footer p { color:#484f58; font-size:13px; }
 <div class="main">
   <div class="choice-btn btn-yes" id="btnYes">
     <span class="hint-left">◀</span>
-    <span class="emoji" style="color:#2ea043;font-family:sans-serif;font-weight:900;font-size:clamp(80px,20vw,160px)">O</span>
+    <span class="emoji" style="color:#2ea043;font-family:sans-serif;font-weight:900">O</span>
     <span class="label">네</span>
   </div>
   <div class="choice-btn btn-no" id="btnNo">
-    <span class="emoji" style="color:#f85149;font-family:sans-serif;font-weight:900;font-size:clamp(80px,20vw,160px)">X</span>
+    <span class="emoji" style="color:#f85149;font-family:sans-serif;font-weight:900">X</span>
     <span class="label">아니오</span>
     <span class="hint-right">▶</span>
   </div>
@@ -230,7 +230,7 @@ function select(dir) {
     sText.textContent = '네';
     btnYes.classList.add('fired');
     setTimeout(() => btnYes.classList.remove('fired'), 400);
-    showToast('⭕', '네');
+    showToast('O', '네');
     speak('네');
     navigator.vibrate && navigator.vibrate([80,30,80]);
   } else {
