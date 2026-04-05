@@ -190,39 +190,27 @@ const tEmoji  = document.getElementById('tEmoji');
 const tLabel  = document.getElementById('tLabel');
 
 // ── TTS ──
-let ttsVoice = null;
-let ttsInitialized = false;
-
-function pickVoice() {
-  const v = speechSynthesis.getVoices();
-  ttsVoice = v.find(x => x.lang === 'ko-KR' && x.localService)
-          || v.find(x => x.lang === 'ko-KR')
-          || v.find(x => x.lang.startsWith('ko'))
-          || (v.length ? v[0] : null);
-}
-
 function initTTS() {
-  if (ttsInitialized || !window.speechSynthesis) return;
-  ttsInitialized = true;
-  pickVoice();
-  speechSynthesis.onvoiceschanged = pickVoice;
+  if (ttsReady || !window.speechSynthesis) return;
+  speechSynthesis.speak(new SpeechSynthesisUtterance(''));
+  ttsReady = true;
 }
-
 function speakText(text) {
   if (!window.speechSynthesis) return;
   speechSynthesis.cancel();
   setTimeout(() => {
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = 'ko-KR'; u.rate = 0.85; u.volume = 1;
-    if (ttsVoice) u.voice = ttsVoice;
-    u.onstart = () => sText.classList.add('on');
-    u.onend   = () => sText.classList.remove('on');
-    u.onerror = () => sText.classList.remove('on');
+    u.lang='ko-KR'; u.rate=0.85; u.volume=1;
+    const voices = speechSynthesis.getVoices();
+    const ko = voices.find(v=>v.lang==='ko-KR') || voices.find(v=>v.lang.startsWith('ko'));
+    if (ko) u.voice=ko;
+    u.onstart=()=>sText.classList.add('on');
+    u.onend=()=>sText.classList.remove('on');
     speechSynthesis.speak(u);
-  }, 100);
+  }, 150);
 }
-
 function speak(text) { speakText(text); }
+speechSynthesis && speechSynthesis.addEventListener('voiceschanged', ()=>speechSynthesis.getVoices());
 
 // ── 토스트 ──
 let toastTimer = null;
