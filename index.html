@@ -240,9 +240,10 @@ footer p { color:#484f58; font-size:13px; }
 <!-- 로딩 오버레이 -->
 <div id="overlay">
   <div class="ov-icon">📷</div>
-  <div class="ov-msg">카메라 준비 중...</div>
-  <div class="ov-sub">카메라 권한을 허용해주세요<br>iPad 정면 카메라를 사용합니다</div>
-  <div class="spinner"></div>
+  <div class="ov-msg" id="ovMsg">카메라 준비 중...</div>
+  <div class="ov-sub" id="ovSub">카메라 권한을 허용해주세요<br>iPad 정면 카메라를 사용합니다</div>
+  <div class="spinner" id="ovSpinner"></div>
+  <button id="ovBtn" style="display:none" onclick="location.reload()">다시 시도</button>
 </div>
 
 <!-- 감지용 (숨김) -->
@@ -545,8 +546,19 @@ function onResults(results) {
 async function initMediaPipe() {
   const video  = document.getElementById('video');
   const canvas = document.getElementById('canvas');
+  const ovMsg  = document.getElementById('ovMsg');
+  const ovSub  = document.getElementById('ovSub');
+  const ovBtn  = document.getElementById('ovBtn');
+  const ovSpinner = document.getElementById('ovSpinner');
+
+  // 타임아웃 버튼 (20초 후 표시)
+  const timeoutId = setTimeout(() => {
+    ovBtn.style.display = 'block';
+    ovSub.textContent = '로딩이 너무 오래 걸려요. 다시 시도해보세요.';
+  }, 20000);
 
   // 카메라 스트림
+  ovMsg.textContent = '카메라 연결 중...';
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'user', width:640, height:480 },
@@ -555,16 +567,18 @@ async function initMediaPipe() {
     video.srcObject = stream;
     await video.play();
   } catch(e) {
-    overlay.innerHTML = `
-      <div class="ov-icon">⚠️</div>
-      <div class="ov-msg">카메라 접근 실패</div>
-      <div class="ov-sub">Safari 설정 → 카메라 권한을 허용해주세요<br>그 후 페이지를 다시 열어주세요</div>
-      <button onclick="location.reload()">다시 시도</button>
-    `;
+    clearTimeout(timeoutId);
+    ovMsg.textContent = '카메라 접근 실패';
+    ovSub.innerHTML = 'Chrome 주소창 왼쪽 🔒 클릭<br>→ 카메라 허용 → 새로고침';
+    ovSpinner.style.display = 'none';
+    ovBtn.style.display = 'block';
     return;
   }
 
-  // Face Mesh
+  // Face Mesh 로드
+  ovMsg.textContent = 'AI 모델 로딩 중... (10~30초)';
+  ovSub.textContent = '처음 한 번만 다운로드합니다';
+
   const faceMesh = new FaceMesh({
     locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4/${f}`
   });
@@ -578,24 +592,45 @@ async function initMediaPipe() {
 
   faceMesh.onResults(onResults);
 
-  // 프레임 루프
+  // 첫 프레임 전송으로 모델 초기화 트리거
   const ctx = canvas.getContext('2d');
-  async function loop() {
-    canvas.width  = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0);
-    await faceMesh.send({ image: canvas });
-    requestAnimationFrame(loop);
-  }
 
-  video.addEventListener('loadeddata', async () => {
-    // 오버레이 제거
+  async function startLoop() {
+    clearTimeout(timeoutId);
     overlay.style.display = 'none';
-    camDot.className   = 'cam-dot ok';
+    camDot.className = 'cam-dot ok';
     camLabel.textContent = '카메라 연결됨';
     initTTS();
+
+    async function loop() {
+      if (video.readyState >= 2) {
+        canvas.width  = video.videoWidth  || 640;
+        canvas.height = video.videoHeight || 480;
+        ctx.drawImage(video, 0, 0);
+        try { await faceMesh.send({ image: canvas }); } catch(e) {}
+      }
+      requestAnimationFrame(loop);
+    }
     loop();
-  });
+  }
+
+  // 비디오 준비 확인
+  const checkVideo = () => {
+    if (video.readyState >= 2) {
+      startLoop();
+    } else {
+      video.addEventListener('canplay', startLoop, { once: true });
+      video.addEventListener('loadeddata', startLoop, { once: true });
+    }
+  };
+
+  // FaceMesh 첫 실행으로 모델 다운로드 시작
+  try {
+    canvas.width = 1; canvas.height = 1;
+    await faceMesh.send({ image: canvas });
+  } catch(e) {}
+
+  checkVideo();
 }
 
 // FaceMesh CDN 로드 후 실행
