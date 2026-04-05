@@ -161,8 +161,18 @@ footer {
 }
 footer p { color:#484f58; font-size:13px; }
 
-/* ── 카메라 (숨김, 감지용) ── */
-#video { display:none; }
+/* ── 카메라 미리보기 (왼쪽 하단 작게) ── */
+#video {
+  position:fixed;
+  bottom:16px; left:16px;
+  width:120px; height:90px;
+  border-radius:10px;
+  border:2px solid #30363d;
+  object-fit:cover;
+  transform:scaleX(-1);
+  z-index:50;
+  opacity:0.85;
+}
 #canvas { display:none; }
 
 /* ── 눈깜빡임 게이지 ── */
